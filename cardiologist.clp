@@ -7,6 +7,21 @@
 ;;; medically tested or approved in any manner
 
 
+
+
+;;; DEFFUNCTIONS
+
+;;; A function to calculate BMI
+;;; Formula from http://en.wikipedia.org/wiki/Body_mass_index
+
+(deffunction body-mass-index (?mass ?height)
+    (if (and (?numberp ?mass) (?numberp ?height))
+        (/ ?mass (* ?height ?height)))
+    else (printout t "BMI function given parameters that are not numbers."))
+
+
+
+
 ;;; DEFTEMPLATES
 ;;; Patient descriptors
 
@@ -25,9 +40,11 @@
 	(slot weight (type DOUBLE) (range 0.5 400.0))
 	(slot systolic-bp-avg (type INTEGER) (range 0 200))
 	(slot diastolic-bp-avg (type INTEGER) (range 0 350))
-	(slot BMI (type DOUBLE) (range 0 70)))
+	(slot BMI (type DOUBLE) (range 0 70))
+    (slot height (type DOUBLE) (range 0.2 3.0)))
 	
-	
+
+
 ;;; DEFFACTS 
 ;;; People profiles
 (deffacts people
