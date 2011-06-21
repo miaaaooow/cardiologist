@@ -37,11 +37,11 @@
 
 ;;; Patient current 
 (deftemplate patient-current-indicators
-	(slot weight (type DOUBLE) (range 0.5 400.0))
+	(slot weight (type FLOAT) (range 0.5 400.0))
 	(slot systolic-bp-avg (type INTEGER) (range 0 200))
 	(slot diastolic-bp-avg (type INTEGER) (range 0 350))
-	(slot BMI (type DOUBLE) (range 0 70))
-    (slot height (type DOUBLE) (range 0.2 3.0)))
+	(slot BMI (type FLOAT) (range 0 70))
+    (slot height (type FLOAT) (range 0.2 3.0)))
 	
 
 
