@@ -1,7 +1,20 @@
-;;; A Project in Expert Systems, AI Masters', FMI, Sofia University
-;;; Author: Maria Mateva
-;;; CARDIOLOGIST - a system, simulating initial profilactics with a 
-;;; 				cardiologist with a focus on hypertension problems
-;;; 			
-;;; Disclaimer: Please note, that this project resembles reality but is 
-;;; NOT medically tested or approved in any manner
+University Course Project
+
+University course: Expert Systems
+Master's programme: Artificial Intelligence
+Leader: Assoc. Prof. Maria Nisheva
+Faculty: FMI
+University: Sofia University, Sofia, Bulgaria
+Date: July, 2011
+Author: Maria Mateva
+
+CARDIOLOGIST is a simple expert system, simulating initial profilactics with a cardiologist with a focus on hypertension problems, cardiac ischemia and arrhythmia.
+ 			
+DISCLAIMER: Please note, that this project resembles reality to a certain extent, but is NOT medically tested or approved in any manner!!!
+
+
+
+Expertise gained from(but NOT approved by):
+1. GP PhD Ana Diamandieva-Mateva
+2. http://www.bettermedicine.com/article/ischemia/symptoms
+3. 
