@@ -83,7 +83,7 @@ syn keyword clipsString           build check-syntax eval lowcase str-cat str-co
 syn keyword clipsString           sub-string sym-cat upcase
 syn keyword clipsSystemClasses    ADDRESS EXTERNAL-ADDRESS FACT-ADDRESS FLOAT INITIAL-OBJECT INSTANCE INSTANCE-ADDRESS 
 syn keyword clipsSystemClasses    INSTANCE-NAME INTEGER LEXEME MULTIFIELD NUMBER OBJECT PRIMITIVE STRING SYMBOL USER
-syn keyword clipsTemplate         deftemplate-module deftemplate-slot-allowed-values deftemplate-slot-cardinality 
+syn keyword clipsTemplate         deftemplate deftemplate-module deftemplate-slot-allowed-values deftemplate-slot-cardinality 
 syn keyword clipsTemplate         deftemplate-slot-default_value deftemplate-slot-defaultp deftemplate-slot-existp 
 syn keyword clipsTemplate         deftemplate-slot-multip deftemplate-slot-names deftemplate-slot-range deftemplate-slot-singlep 
 syn keyword clipsTemplate         deftemplate-slot-types get-deftemplate-list list-deftemplates ppdeftemplate undeftemplate
