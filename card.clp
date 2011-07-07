@@ -4,7 +4,7 @@
 
 ; Welcome message
 (deffunction welcome ()
-    (printout t "WECLOME to CARDIOLOGIST" crlf)
+    (printout t "WECLOME to CARDIOLOGIST 1.0" crlf)
     (printout t "This is an experimental proficatic cardiologist expert system." crlf crlf)
     (printout t "For comments or suggestions, please write to me to mateva.maria in gmail" crlf))
 
@@ -19,17 +19,34 @@
             (printout t "Wrong BMI params!")))
 
 
-(deffunction ask-question (?question $?allowed-values) 
+; Functions for asking questions
+; Takes a question and allowed values as parameters.
+; Returns a lowercase version of the user input.
+(deffunction check-test-result (?test $?allowed-values) 
+    (bind ?question (str-cat "What is your result on the following test: " ?test "(" ?allowed-values ")? ")) 
     (printout t ?question crlf)
     (bind ?answer (lowcase (read))) 
     (while (and (not (lexemep ?answer)) 
-                (not (member ?answer ?allowed-values)))
+                (not (member ?answer ?allowed-values))) do
             (printout t "You have entered an invalid value." crlf)
             (printout t ?question crlf))
     (bind ?answer (lowcase (read)))
     ?answer)
 
 
+(deffunction check-symptom (?symptom)
+   (printout t "Do you lately happen to have the following symptom: ?sympom (yes/no) " ?symptom crlf) 
+   (bind ?answer (lowcase (read)))
+   (while (not (or (eq ?answer "yes") (eq ?answer "no"))) do 
+        (printout t "Do you lately happen to have the following symptom: ?symptom? Please answer with \"yes\" or \"no\"; fill in \"no\" if not sure. " ?symptom crlf)
+        (bind ?answer (lowcase(read)))
+   )
+   if (eq ?answer "yes")
+       then TRUE
+       else FALSE)
+   
+   
+   
 ; DEFTEMPLATES
 ; Patient descriptors
 
@@ -56,3 +73,26 @@
 )
 
 ; RULES
+
+; Initial rule
+(defrule get-the-party-started
+    "Welcome message"
+    =>
+    (welcome)
+    (watch facts))
+
+; Take rule making from animals expert system
+
+(defrule just-test
+""
+=>
+(printout t test))
+
+
+
+
+
+
+
+
+
