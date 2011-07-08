@@ -29,27 +29,33 @@
 
 ; Body-mass index(BMI) function
 ; mass and height are previously checked to be numbers
-(deffunction body-mass-index-ok (?mass ?height ?gender)
+(deffunction body-mass-index-ok (?mass ?height)
     "This function calculates the body mass index"
-    (if  (> (/ ?mass (* ?height ?height)) 30 )
-        then FALSE
-        else TRUE))
+    (/ ?mass (* ?height ?height)))
+	
+(deffunction is-BMI-normal (?BMI ?normal-value)
+	(if (> ?normal-value ?BMI)
+		then TRUE
+		else FALSE))
      
 
 ; Heart-rate function
 ; 205.8 - 0.685 * age > hr
 ; age and hr are previously checked to be numbers
-
-(deffunction heart-rate-ok (?heart-rate ?age) 
+(deffunction is-heart-rate-ok (?heart-rate ?age) 
     (if (> (- 205.5 (* 0.685 ?age)) ?heart-rate)
         then TRUE
         else FALSE))
 
 
+(deffunction is-high-blood-pressure (?age ?gender ?sbp ?dbp)
+	TRUE)
+
+
 ;Function to calculate the diagnosis on the base of a global delta 
 ;If the delta is less than the delta-boundary, then we cannot decide which diagnosis is right
 ; and go for "other" diagnosis.
-(deffunction find-diagnosis (?a ?i ?h ?delta)
+(deffunction find-diagnosis (?a ?i ?h)
     (bind ?arr-delta (- ?a ?*arrhytmia-boundary*))
     (bind ?hyp-delta (- ?h ?*hypertension-boundary*))
     (bind ?isc-delta (- ?i ?*ischemic-boundary*))
@@ -62,23 +68,23 @@
             (if (and 
                 (not (> ?arr-delta ?*delta-boundary*))
                 (not (> ?hyp-delta ?*delta-boundary*))
-                (not (> ?isc-delts ?*delta-boundary*))
+                (not (> ?isc-delta ?*delta-boundary*))
                 )
             then ?*other*
-            else FALSE)))
-
+            else ?*healthy*)))
 
 
 ; Functions for asking questions
 ; Takes a question and allowed values as parameters.
 ; Returns a lowercase version of the user input.
-(deffunction check-test-result (?test $?allowed-values) 
-    (bind ?question (str-cat "What is your result on the following test: " ?test "(" ?allowed-values ")? ")) 
+(deffunction check-test-result (?test) 
+    (bind ?question (str-cat "What is your result on the following test: " ?test "(OK/PRoblematic)? ")) 
     (printout t ?question)
     (bind ?answer (lowcase (read))) 
-    (while (and (not (lexemep ?answer)) 
-                (not (member ?answer ?allowed-values))) do
-            (printout t "You have entered an invalid value." crlf)
+    (while (and (not (eq ?answer "ok")) 
+                (not (eq ?answer "pr"))
+				(not (eq ?answer "problematic"))) do
+            (printout t "You have entered an invalid value. Please enter \"ok\" or \"pr\"" crlf)
             (printout t ?question))
     (bind ?answer (lowcase (read)))
     ?answer)
@@ -106,35 +112,49 @@
         (printout t ?question)
         (bind ?answer (lowcase(read))))
    ?answer)
-   
+
+
+(deffunction suggest-treatment (?diagnose ?healthy $?next)
+   (printout t "CARDIOLOGIST resuls:" crlf)
+   (if (eq ?healthy TRUE)
+    then
+        (printout t "You are completely healthy")
+    else
+        (printout t "You probably have some problems. CARDIOLOGIST considers ?diagnose" ?diagnose)
+        (printout t crlf "You are advised to go to a specialist, preparing the following examinations:" ?next)))
+
    
 ; DEFTEMPLATES
 ; Patient descriptors
 
-
 ; Patient current profile
 (deftemplate patient-profile
 	(slot age (type INTEGER) (range 1 125))
-	(slot gender (type SYMBOL) (allowed-values m f))
-	(slot status (type SYMBOL) (allowed-values healthy on-a-regime on-medicines supervised has-been-hospitalized hospitalized))
-	(slot in-born-problem (type SYMBOL) (allowed-values yes no))
-	(slot bad-hypertension-heredity (type SYMBOL) (allowed-values yes no))
-)
-
-; Patient current 
-(deftemplate patient-current-indicators
+	(slot gender (type INTEGER) (range 1 2))
     (slot weight (type FLOAT))
-	(slot systolic-bp-avg (type INTEGER) (range 0 200))
-	(slot diastolic-bp-avg (type INTEGER) (range 0 350))
+    (slot height (type INTEGER))
+	;slot status (type SYMBOL) (allowed-values healthy on-a-regime on-medicines supervised has-been-hospitalized hospitalized))
+	;slot in-born-problem (type SYMBOL) (allowed-values yes no))
+	(slot systolic-bp-avg (type INTEGER) (range 0 200))  ; lower blood pressure bound
+	(slot diastolic-bp-avg (type INTEGER) (range 0 350)) ; lower blood pressure bound
+	(slot heart-rate (type INTEGER) (range 0 220))
 	(slot BMI (type FLOAT) (range 0.0 70.0))
-    (slot height (type FLOAT) (range 0.2 3.0))
-    (slot lungs-status (type SYMBOL) (allowed-values OK problematic))
-    (slot increased-kidney (type SYMBOL)(allowed-values yes no)))
+    (slot blood-count (type SYMBOL) (allowed-values OK problematic))
+	(slot blood-sugar (type SYMBOL) (allowed-values OK problematic))
+	(slot creatine (type SYMBOL) (allowed-values OK problematic))
+	(slot lipid-profile (type SYMBOL) (allowed-values OK problematic))
+	(slot cardiac-history (type SYMBOL) (allowed-values OK problematic))
+	(slot cardiac-status (type SYMBOL) (allowed-values OK problematic))
+	(slot ECG (type SYMBOL) (allowed-values OK problematic))
+	(slot dizziness (type SYMBOL) (allowed-values OK problematic))
+    (slot increased-internal-organs (type SYMBOL)(allowed-values OK problematic)))
+
 
 (deftemplate test-type
     (slot test-name (type SYMBOL)(allowed-values blood-count blood-sugar ;
 		creatine lipid-profile cardiac-history ECG increased-liver-lung ;
-		cardiac-history dizziness cardiac-status))
+		cardiac-history dizziness cardiac-status BMI-over-limit;
+        heart-rate-increased high-blood-pressure))
     (slot value (type FLOAT)))
 
 
@@ -151,9 +171,15 @@
     (slot value (type FLOAT)))
 
 
+(deftemplate process-further
+	(slot add-to-sum (type FLOAT)))
+
+
 ; FACTS
+
 ; A matrix with empiric values of weights of which symptome proves which diagnosis.
 ; These might be extracted during education with an expert.
+
 (deffacts diagnosis-symptome-weight-matrix
 	(diagnosis-possibilities
 		(diagnosis-name hypertension)
@@ -262,18 +288,100 @@
 		(value 0.1))
 	(test-type
 		(test-name dizziness)
-		(value 0.1)))
+		(value 0.1))
+	(test-type
+		(test-name BMI-over-limit)
+		(value 0.45))
+	(test-type
+		(test-name heart-rate-increased)
+		(value 0.5))
+	(test-type
+		(test-name high-blood-pressure)
+		(value 0.5)))
 
 
 ; RULES
 
-
 ; Initial rule
-(defrule get-the-party-started
+(defrule welcome
     "Welcome message"
     =>
     (welcome)
     (watch facts))
+
+(defrule ask-for-personal-data "patient general tests information"
+	(declare (salience 100))
+    =>
+	(bind ?age (get-numeric-indicator "age" 1 125))
+	(bind ?age (get-numeric-indicator "gender(1=f, 2=m)" 1 2))
+    (bind ?height (get-numeric-indicator "height" 100 280))
+    (bind ?weight (get-numeric-indicator "weight" 1 400))
+	(bind ?BMI (body-mass-index-ok ?height ?weight))
+    (bind ?sbp (get-numeric-indicator "systolic blood pressure avg" 0 200))
+	(bind ?dbp (get-numeric-indicator "diastolic blood pressure avg" 0 350)
+	(bind ?hr (get-numeric-indicator "heart rate" 0 220)
+	(bind ?bc (check-test-result "blood count"))
+	(bind ?bs (check-test-result "blood sugar"))
+	(bind ?cr (check-test-result "creatine"))
+	(bind ?lp (check-test-result "lipid profile"))
+	(bind ?ch (check-test-result "cardiac history"))
+	(bind ?cs (check-test-result "cardiac status"))
+	(bind ?ecg (check-test-result "electro-cardiogram(ECG)"))
+    (bind ?diz (check-test-result "dizziness"))
+	(bind ?iio (check-test-result "increazed internal organs"))
+    (if (not (is-BMI-normal ?BMI 30))
+		then 
+		(?value&:(test-type (test-name BMI-over-limit) (value ?value)))
+		(assert (add-to-sum ?value)))
+	(if (is-high-blood-pressure (?age ?gender ?sbp ?dbp))
+		then 
+		(bind ?value&:(test-type (test-name heart-rate-increased) (value ?value)))
+		(assert (add-to-sum ?value)))
+	(if (not (eq ?bc "ok"))
+		then
+		(bind ?value&:(test-type (test-name blood-count) (value ?value)))
+		(assert (add-to-sum ?value)))
+	(if (not (eq ?bs "ok"))
+		then
+		(bind ?value&:(test-type (test-name blood-sugar) (value ?value)))
+		(assert (add-to-sum ?value)))
+	(if (not (eq ?cr "ok"))
+		then
+		(bind ?value&:(test-type (test-name creatine) (value ?value)))
+		(assert (add-to-sum ?value)))
+	(if (not (eq ?lp "ok"))
+		then
+		(bind ?value&:(test-type (test-name lipid-profile) (value ?value)))
+		(assert (add-to-sum ?value)))
+	(if (not (eq ?ch "ok"))
+		then
+		(bind ?value&:(test-type (test-name cardiac-history) (value ?value)))
+		(assert (add-to-sum ?value)))
+	(if (not (eq ?cs "ok"))
+		then
+		(bind ?value&:(test-type (test-name cardiac-status) (value ?value)))
+		(assert (add-to-sum ?value)))
+	(if (not (eq ?ecg "ok"))
+		then
+		(bind ?value&:(test-type (test-name ECG) (value ?value)))
+		(assert (add-to-sum ?value)))
+	(if (not (eq ?diz "ok"))
+		then
+		(bind ?value&:(test-type (test-name dizziness) (value ?value)))
+		(assert (add-to-sum ?value)))
+	(if (not (eq ?iio "ok"))
+		then
+		(bind ?value&:(test-type (test-name increazed-internal-organs) (value ?value)))
+		(assert (add-to-sum ?value))))
+		
+    
+
+;(defrule make-conclusions
+; (declare (salience 90))
+;)
+;(defrule test-info
+;)
+;(defrule check-diagnosis )
 
 
 
