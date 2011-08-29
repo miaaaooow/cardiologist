@@ -10,7 +10,8 @@
     ?*arrhytmia* = "arrhytmia"
     ?*other* = "other"
     ;NUM CONSTS for precise calculations of diagnosis
-    ?*healthiness-boundary* = 1.5
+    ?*healthiness-factor* = 0
+    ?*healthiness-boundary* = 1.0
     ?*hypertension-boundary* = 1.5
     ?*arrhytmia-boundary* = 1.5
     ?*ischemic-boundary* = 1.5
@@ -47,9 +48,12 @@
         then TRUE
         else FALSE))
 
-
+; Function that measures high blood pressure
+; Can be much more suffisticated
 (deffunction is-high-blood-pressure (?age ?gender ?sbp ?dbp)
-	TRUE)
+    (if (> ?dbp  130)
+        then TRUE
+        else FALSE))
 
 
 ;Function to calculate the diagnosis on the base of a global delta 
@@ -104,9 +108,9 @@
    
 
 (deffunction get-numeric-indicator (?indicator-name ?lower-bound ?upper-bound)
-   (bind ?question (str-cat "Please enter your indicator of the following type: " ?indicator-name ": "))
+   (bind ?question (str-cat "Please enter your indicator type " ?indicator-name ": "))
    (printout t ?question crlf)
-   (bind ?answer (lowcase (read)))
+   (bind ?answer (read))
    (while (not (or (>= ?answer ?lower-bound) (<= ?answer ?upper-bound))) do 
         (printout t "Please enter a values between ?lower-bound and ?upper-bound" ?lower-bound ?upper-bound)
         (printout t ?question)
@@ -123,7 +127,38 @@
         (printout t "You probably have some problems. CARDIOLOGIST considers ?diagnose" ?diagnose)
         (printout t crlf "You are advised to go to a specialist, preparing the following examinations:" ?next)))
 
-   
+
+;; Functions to print out results
+
+(deffunction print-init-diagnose ()
+   (printout t "It seems you might have some cardiac issues." crlf)
+   (printout t "Here is a list of further tests You are advised to make and then consult to Your cardiologist:" crlf)
+   (printout t " - Blood Count" crlf)
+   (printout t " - Blood Sugar" crlf)  
+   (printout t " - Creatine" crlf)
+   (printout t " - Lipid Profile" crlf))
+
+(deffunction print-diagnose (?diagnose)
+   (bind ?diag (str-cat " There is a possibility that You have " ?diagnose ". " ))
+   (printout t ?diag crlf)
+   (printout t "Here is a list of further tests You are advised to make in order to address this issue:" crlf)
+   (if (eq ?diagnose ?*hypertension*)
+	then
+	   (printout t " - Creatine" crlf)
+	else
+	(if (eq ?diagnose ?*ischemic*)
+	 then
+		(printout t " - CRD" crlf)
+		(printout t " - BET" crlf)
+		(printout t " - Echo Cardiography" crlf)
+	 else
+	 (if (eq ?diagnose ?*arrhytmia*)
+	  then
+		(printout t " - Holter ECG" crlf)
+		(printout t " - TSH Hormone" crlf)
+		(printout t " - Echo Cardiography" crlf)))))
+  
+  
 ; DEFTEMPLATES
 ; Patient descriptors
 
@@ -133,29 +168,27 @@
 	(slot gender (type INTEGER) (range 1 2))
     (slot weight (type FLOAT))
     (slot height (type INTEGER))
-	;slot status (type SYMBOL) (allowed-values healthy on-a-regime on-medicines supervised has-been-hospitalized hospitalized))
-	;slot in-born-problem (type SYMBOL) (allowed-values yes no))
 	(slot systolic-bp-avg (type INTEGER) (range 0 200))  ; lower blood pressure bound
-	(slot diastolic-bp-avg (type INTEGER) (range 0 350)) ; lower blood pressure bound
+	(slot diastolic-bp-avg (type INTEGER) (range 0 350)) ; higher blood pressure bound
 	(slot heart-rate (type INTEGER) (range 0 220))
 	(slot BMI (type FLOAT) (range 0.0 70.0))
-    (slot blood-count (type SYMBOL) (allowed-values OK problematic))
-	(slot blood-sugar (type SYMBOL) (allowed-values OK problematic))
-	(slot creatine (type SYMBOL) (allowed-values OK problematic))
-	(slot lipid-profile (type SYMBOL) (allowed-values OK problematic))
 	(slot cardiac-history (type SYMBOL) (allowed-values OK problematic))
 	(slot cardiac-status (type SYMBOL) (allowed-values OK problematic))
 	(slot ECG (type SYMBOL) (allowed-values OK problematic))
-	(slot dizziness (type SYMBOL) (allowed-values OK problematic))
-    (slot increased-internal-organs (type SYMBOL)(allowed-values OK problematic)))
+    (slot increased-liver-lung (type SYMBOL)(allowed-values OK problematic)))
 
 
 (deftemplate test-type
-    (slot test-name (type SYMBOL)(allowed-values blood-count blood-sugar ;
-		creatine lipid-profile cardiac-history ECG increased-liver-lung ;
+    (slot test-name (type SYMBOL)(allowed-values cardiac-history ECG increased-liver-lung ;
 		cardiac-history dizziness cardiac-status BMI-over-limit;
         heart-rate-increased high-blood-pressure))
     (slot value (type FLOAT)))
+
+
+(deftemplate test-type-present
+    (slot test-name (type SYMBOL)(allowed-values cardiac-history ECG increased-liver-lung ;
+		cardiac-history dizziness cardiac-status BMI-over-limit;
+        heart-rate-increased high-blood-pressure)))
 
 
 (deftemplate diagnosis-possibilities
@@ -163,7 +196,7 @@
     (slot indicator (type SYMBOL) (allowed-values shortness-of-breath fatigue;
 		weakness rapid-heartbeat chest-pain has-swellings palpitations nausea;
 		sweating fainting hypertonic-ancestors))
-    (slot value (type FLOAT) (range 0.0 1.0)))
+    (slot value (type FLOAT) (range 0.0 1.0))) 
 
 
 (deftemplate diagnosis-values
@@ -175,6 +208,10 @@
 	(slot add-to-sum (type FLOAT)))
 
 
+(deftemplate possible-desease
+    (slot is-possible (type SYMBOL) (allowed-values yes no)))
+
+
 ; FACTS
 
 ; A matrix with empiric values of weights of which symptome proves which diagnosis.
@@ -182,203 +219,146 @@
 
 (deffacts diagnosis-symptome-weight-matrix
 	(diagnosis-possibilities
-		(diagnosis-name hypertension)
-		(indicator shortness-of-breath)
-		(value 0.7))
+		(diagnosis-name hypertension) (indicator shortness-of-breath) (value 0.7))
 	(diagnosis-possibilities
-		(diagnosis-name hypertension)
-		(indicator fatigue)
-		(value 0.2))		
+		(diagnosis-name hypertension) (indicator fatigue) (value 0.2))		
 	(diagnosis-possibilities
-		(diagnosis-name hypertension)
-		(indicator rapid-heartbeat)
-		(value 0.5))
+		(diagnosis-name hypertension) (indicator rapid-heartbeat) (value 0.5))
 	(diagnosis-possibilities
-		(diagnosis-name hypertension)
-		(indicator chest-pain)
-		(value 0.4))
+		(diagnosis-name hypertension) (indicator chest-pain) (value 0.4))
 	(diagnosis-possibilities
-		(diagnosis-name hypertension)
-		(indicator has-swellings)
-		(value 0.2))	
+		(diagnosis-name hypertension) (indicator has-swellings) (value 0.2))	
 	(diagnosis-possibilities
-		(diagnosis-name hypertension)
-		(indicator hypertonic-ancestors)
-		(value 0.3))
+		(diagnosis-name hypertension) (indicator hypertonic-ancestors) (value 0.3))
 	(diagnosis-possibilities
-		(diagnosis-name ischemia)
-		(indicator chest-pain)
-		(value 0.3))
+		(diagnosis-name ischemia) (indicator chest-pain) (value 0.3))
 	(diagnosis-possibilities
-		(diagnosis-name ischemia)
-		(indicator has-swellings)
-		(value 0.1))
+		(diagnosis-name ischemia) (indicator has-swellings) (value 0.1))
 	(diagnosis-possibilities
-		(diagnosis-name ischemia)
-		(indicator palpitations)
-		(value 0.6))
+		(diagnosis-name ischemia) (indicator palpitations) (value 0.6))
 	(diagnosis-possibilities
-		(diagnosis-name ischemia)
-		(indicator nausea)
-		(value 0.9))
+		(diagnosis-name ischemia) (indicator nausea) (value 0.9))
 	(diagnosis-possibilities
-		(diagnosis-name ischemia)
-		(indicator sweating)
-		(value 0.1))
+		(diagnosis-name ischemia) (indicator sweating) (value 0.1))
 	(diagnosis-possibilities
-		(diagnosis-name ischemia)
-		(indicator weakness)
-		(value 0.1))
+		(diagnosis-name ischemia) (indicator weakness) (value 0.1))
 	(diagnosis-possibilities
-		(diagnosis-name arrhytmia)
-		(indicator shortness-of-breath)
-		(value 0.4))
+		(diagnosis-name arrhytmia) (indicator shortness-of-breath) (value 0.4))
 	(diagnosis-possibilities
-		(diagnosis-name arrhytmia)
-		(indicator chest-pain)
-		(value 0.3))
+		(diagnosis-name arrhytmia) (indicator chest-pain) (value 0.3))
 	(diagnosis-possibilities
-		(diagnosis-name arrhytmia)
-		(indicator has-swellings)
-		(value 0.1))
+		(diagnosis-name arrhytmia) (indicator has-swellings) (value 0.1))
 	(diagnosis-possibilities
-		(diagnosis-name arrhytmia)
-		(indicator palpitations)
-		(value 0.8))
+		(diagnosis-name arrhytmia) (indicator palpitations) (value 0.8))
 	(diagnosis-possibilities
-		(diagnosis-name arrhytmia)
-		(indicator sweating)
-		(value 0.1))
+		(diagnosis-name arrhytmia) (indicator sweating) (value 0.1))
 	(diagnosis-possibilities
-		(diagnosis-name arrhytmia)
-		(indicator weakness)
-		(value 0.1))
+		(diagnosis-name arrhytmia) (indicator weakness) (value 0.1))
 	(diagnosis-possibilities
-		(diagnosis-name arrhytmia)
-		(indicator fainting)
-		(value 0.4)))
+		(diagnosis-name arrhytmia) (indicator fainting) (value 0.4)))
 	
 	
 ; A matrix with empiric values of weights of each initial test.
 ; These might be extracted during education with an expert.
 (deffacts test-type-weight-matrix
 	(test-type
-		(test-name blood-count)
-		(value 0.3))
+		(test-name cardiac-history)	(value 0.5))
 	(test-type
-		(test-name blood-sugar)
-		(value 0.4))
+		(test-name cardiac-status) (value 0.5))
 	(test-type
-		(test-name creatine)	
-		(value 0.1))
+		(test-name ECG) (value 0.5)) 
 	(test-type
-		(test-name lipid-profile)
-		(value 0.2))
+		(test-name increased-liver-lung) (value 0.1))
 	(test-type
-		(test-name cardiac-history)	
-		(value 0.5))
+		(test-name dizziness) (value 0.1))
 	(test-type
-		(test-name cardiac-status)
-		(value 0.5))
+		(test-name BMI-over-limit) (value 0.45))
 	(test-type
-		(test-name ECG)
-		(value 0.5))
+		(test-name heart-rate-increased) (value 0.5))
 	(test-type
-		(test-name increased-liver-lung)
-		(value 0.1))
-	(test-type
-		(test-name dizziness)
-		(value 0.1))
-	(test-type
-		(test-name BMI-over-limit)
-		(value 0.45))
-	(test-type
-		(test-name heart-rate-increased)
-		(value 0.5))
-	(test-type
-		(test-name high-blood-pressure)
-		(value 0.5)))
+		(test-name high-blood-pressure) (value 0.5)))
 
 
 ; RULES
 
-; Initial rule
+; Initial welcoming rule
 (defrule welcome
     "Welcome message"
     =>
     (welcome)
     (watch facts))
 
+
+
 (defrule ask-for-personal-data "patient general tests information"
 	(declare (salience 100))
     =>
+    (assert (process-further (add-to-sum 0.0)))
 	(bind ?age (get-numeric-indicator "age" 1 125))
-	(bind ?age (get-numeric-indicator "gender(1=f, 2=m)" 1 2))
+	(bind ?gender (get-numeric-indicator "gender(1=f, 2=m)" 1 2))
     (bind ?height (get-numeric-indicator "height" 100 280))
     (bind ?weight (get-numeric-indicator "weight" 1 400))
 	(bind ?BMI (body-mass-index-ok ?height ?weight))
     (bind ?sbp (get-numeric-indicator "systolic blood pressure avg" 0 200))
-	(bind ?dbp (get-numeric-indicator "diastolic blood pressure avg" 0 350)
-	(bind ?hr (get-numeric-indicator "heart rate" 0 220)
-	(bind ?bc (check-test-result "blood count"))
-	(bind ?bs (check-test-result "blood sugar"))
-	(bind ?cr (check-test-result "creatine"))
-	(bind ?lp (check-test-result "lipid profile"))
+	(bind ?dbp (get-numeric-indicator "diastolic blood pressure avg" 0 350))
+	(bind ?hr (get-numeric-indicator "heart rate" 0 220))
 	(bind ?ch (check-test-result "cardiac history"))
 	(bind ?cs (check-test-result "cardiac status"))
 	(bind ?ecg (check-test-result "electro-cardiogram(ECG)"))
-    (bind ?diz (check-test-result "dizziness"))
-	(bind ?iio (check-test-result "increazed internal organs"))
-    (if (not (is-BMI-normal ?BMI 30))
-		then 
-		(?value&:(test-type (test-name BMI-over-limit) (value ?value)))
-		(assert (add-to-sum ?value)))
-	(if (is-high-blood-pressure (?age ?gender ?sbp ?dbp))
-		then 
-		(bind ?value&:(test-type (test-name heart-rate-increased) (value ?value)))
-		(assert (add-to-sum ?value)))
-	(if (not (eq ?bc "ok"))
-		then
-		(bind ?value&:(test-type (test-name blood-count) (value ?value)))
-		(assert (add-to-sum ?value)))
-	(if (not (eq ?bs "ok"))
-		then
-		(bind ?value&:(test-type (test-name blood-sugar) (value ?value)))
-		(assert (add-to-sum ?value)))
-	(if (not (eq ?cr "ok"))
-		then
-		(bind ?value&:(test-type (test-name creatine) (value ?value)))
-		(assert (add-to-sum ?value)))
-	(if (not (eq ?lp "ok"))
-		then
-		(bind ?value&:(test-type (test-name lipid-profile) (value ?value)))
-		(assert (add-to-sum ?value)))
+	(bind ?ill (check-test-result "increazed liver or lung"))
+    (assert (patient-profile
+             (age ?age)
+             (gender ?gender)
+             (weight ?weight)
+             (height ?height)
+             (systolic-bp-avg ?sbp)
+             (diastolic-bp-avg ?dbp)
+             (heart-rate ?hr)
+             (BMI ?BMI)
+             (cardiac-history ?ch)
+             (cardiac-status ?cs)
+             (ECG ?ecg)
+             (increased-liver-lung ?ill)))
+    ;if (not (is-BMI-normal ?BMI 30))
+	;then 
+	;(?value&:(test-type (test-name BMI-over-limit) (value ?value)))
+	;(assert (add-to-sum ?value)))
+   
+	;(if (is-high-blood-pressure (?age ?gender ?sbp ?dbp))
+	;	then 
+	;	(bind ?value&:(test-type (test-name heart-rate-increased) (value ?value)))
+	;	(assert (add-to-sum ?value)))
+		
 	(if (not (eq ?ch "ok"))
 		then
-		(bind ?value&:(test-type (test-name cardiac-history) (value ?value)))
-		(assert (add-to-sum ?value)))
+		(assert (test-type-present (test-name cardiac-history))))		
 	(if (not (eq ?cs "ok"))
 		then
-		(bind ?value&:(test-type (test-name cardiac-status) (value ?value)))
-		(assert (add-to-sum ?value)))
+		(assert (test-type-present (test-name cardiac-status))))
 	(if (not (eq ?ecg "ok"))
 		then
-		(bind ?value&:(test-type (test-name ECG) (value ?value)))
-		(assert (add-to-sum ?value)))
-	(if (not (eq ?diz "ok"))
+		(assert (test-type-present (test-name ECG))))
+	(if (not (eq ?ill "ok"))
 		then
-		(bind ?value&:(test-type (test-name dizziness) (value ?value)))
-		(assert (add-to-sum ?value)))
-	(if (not (eq ?iio "ok"))
-		then
-		(bind ?value&:(test-type (test-name increazed-internal-organs) (value ?value)))
-		(assert (add-to-sum ?value))))
+		(assert (test-type-present (test-name increased-liver-lung)))))
 		
     
 
-;(defrule make-conclusions
-; (declare (salience 90))
-;)
+(defrule make-conclusions
+    (declare (salience 90))
+	    (test-type (test-name ?name) (value ?value))
+	    (test-type-present (test-name ?name))
+    =>
+	    (bind ?*healthiness-factor* (+ ?*healthiness-factor* ?value))
+        (printout t ?*healthiness-factor* ctlf))
+	
+    ;(if (> ?*healthiness-factor* ?*healthiness-boundary*)
+    ;    then
+    ;        (assert (possible-disease (is-possible yes)))
+    ;    else
+    ;        (assert (possible-disease (is-possible no)))) )
+
+
 ;(defrule test-info
 ;)
 ;(defrule check-diagnosis )
