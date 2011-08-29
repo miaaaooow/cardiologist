@@ -23,14 +23,14 @@
 
 ; Welcome message
 (deffunction welcome ()
-    (printout t "WECLOME to CARDIOLOGIST 1.0" crlf)
+    (printout t "WECLOME to CARDIOLOGIST 1.1" crlf)
     (printout t "This is an experimental proficatic cardiologist expert system." crlf crlf)
     (printout t "For comments or suggestions, please write to me to mateva.maria in gmail" crlf))
 
 
 ; Body-mass index(BMI) function
 ; mass and height are previously checked to be numbers
-(deffunction body-mass-index-ok (?mass ?height)
+(deffunction body-mass-index (?mass ?height)
     "This function calculates the body mass index"
     (/ ?mass (* ?height ?height)))
 	
@@ -85,12 +85,13 @@
     (bind ?question (str-cat "What is your result on the following test: " ?test "(OK/PRoblematic)? ")) 
     (printout t ?question)
     (bind ?answer (lowcase (read))) 
-    (while (and (not (eq ?answer "ok")) 
-                (not (eq ?answer "pr"))
-				(not (eq ?answer "problematic"))) do
+    (printout t ?answer)
+    (while (and (not (eq ?answer ok)) 
+                (not (eq ?answer pr))
+				(not (eq ?answer problematic))) do
             (printout t "You have entered an invalid value. Please enter \"ok\" or \"pr\"" crlf)
-            (printout t ?question))
-    (bind ?answer (lowcase (read)))
+            (printout t ?question)
+            (bind ?answer (lowcase (read))))
     ?answer)
 
 
@@ -98,35 +99,35 @@
    (bind ?question  (str-cat "Do you lately happen to have the following symptom: ?sympom (yes/no) " ?symptom)) 
    (printout t ?question)
    (bind ?answer (lowcase (read)))
-   (while (not (or (eq ?answer "yes") (eq ?answer "no"))) do 
+   (while (not (or (eq ?answer yes) (eq ?answer no))) do 
         (printout t ?question crlf)
-        (printout t "Please answer with \"yes\" or \"no\"; fill in \"no\" if not sure. " crlf)
+        (printout t "Please answer with \"y\" or \"n\" or \"yes\" or \"no\"; fill in \"no\" if not sure. " crlf)
         (bind ?answer (lowcase(read))))
-   if (eq ?answer "yes")
+   (if (or (eq ?answer yes) (eq ?answer y))
        then TRUE
-       else FALSE)
+       else FALSE))
    
 
+(deffunction get-gender ()
+ (bind ?question  "Please enter your gender(m for male, f for female: ")
+  (printout t ?question)
+  (bind ?answer (read))
+  (while (and (not (eq ?answer m))(not (eq ?answer f))) do 
+       (printout t "Please enter a values among \"f\" and \"m\"!"  crlf)
+       (printout t ?question)
+       (bind ?answer (lowcase(read))))
+  ?answer)
+
+
 (deffunction get-numeric-indicator (?indicator-name ?lower-bound ?upper-bound)
-   (bind ?question (str-cat "Please enter your indicator type " ?indicator-name ": "))
-   (printout t ?question crlf)
+   (bind ?question (str-cat "Please enter your " ?indicator-name ": "))
+   (printout t ?question)
    (bind ?answer (read))
-   (while (not (or (>= ?answer ?lower-bound) (<= ?answer ?upper-bound))) do 
-        (printout t "Please enter a values between ?lower-bound and ?upper-bound" ?lower-bound ?upper-bound)
+   (while (not (or (numberp ?answer) (>= ?answer ?lower-bound) (<= ?answer ?upper-bound))) do 
+        (printout t "Please enter a values between ?lower-bound and ?upper-bound" ?lower-bound ?upper-bound crlf)
         (printout t ?question)
         (bind ?answer (lowcase(read))))
    ?answer)
-
-
-(deffunction suggest-treatment (?diagnose ?healthy $?next)
-   (printout t "CARDIOLOGIST resuls:" crlf)
-   (if (eq ?healthy TRUE)
-    then
-        (printout t "You are completely healthy")
-    else
-        (printout t "You probably have some problems. CARDIOLOGIST considers ?diagnose" ?diagnose)
-        (printout t crlf "You are advised to go to a specialist, preparing the following examinations:" ?next)))
-
 
 ;; Functions to print out results
 
@@ -282,8 +283,8 @@
 ; RULES
 
 ; Initial welcoming rule
-(defrule welcome
-    "Welcome message"
+(defrule welcome "Welcome message"
+    (declare (salience 110))
     =>
     (welcome)
     (watch facts))
@@ -295,10 +296,10 @@
     =>
     (assert (process-further (add-to-sum 0.0)))
 	(bind ?age (get-numeric-indicator "age" 1 125))
-	(bind ?gender (get-numeric-indicator "gender(1=f, 2=m)" 1 2))
+	(bind ?gender (get-gender))
     (bind ?height (get-numeric-indicator "height" 100 280))
     (bind ?weight (get-numeric-indicator "weight" 1 400))
-	(bind ?BMI (body-mass-index-ok ?height ?weight))
+	(bind ?BMI (body-mass-index ?height ?weight))
     (bind ?sbp (get-numeric-indicator "systolic blood pressure avg" 0 200))
 	(bind ?dbp (get-numeric-indicator "diastolic blood pressure avg" 0 350))
 	(bind ?hr (get-numeric-indicator "heart rate" 0 220))
@@ -329,28 +330,29 @@
 	;	(bind ?value&:(test-type (test-name heart-rate-increased) (value ?value)))
 	;	(assert (add-to-sum ?value)))
 		
-	(if (not (eq ?ch "ok"))
+	(if (not (eq ?ch ok))
 		then
 		(assert (test-type-present (test-name cardiac-history))))		
-	(if (not (eq ?cs "ok"))
+	(if (not (eq ?cs ok))
 		then
 		(assert (test-type-present (test-name cardiac-status))))
-	(if (not (eq ?ecg "ok"))
+	(if (not (eq ?ecg ok))
 		then
 		(assert (test-type-present (test-name ECG))))
-	(if (not (eq ?ill "ok"))
+	(if (not (eq ?ill ok))
 		then
 		(assert (test-type-present (test-name increased-liver-lung)))))
 		
     
 
 (defrule make-conclusions
-    (declare (salience 90))
-	    (test-type (test-name ?name) (value ?value))
+    (declare (salience 90)) 
 	    (test-type-present (test-name ?name))
+	    (test-type (test-name ?tname&:(eq ?tname ?name)) (value ?value))
+        ?f <- (process-further (add-to-sum ?sum))
     =>
-	    (bind ?*healthiness-factor* (+ ?*healthiness-factor* ?value))
-        (printout t ?*healthiness-factor* ctlf))
+        (retract ?f)
+	    (assert (process-further (add-to-sum (+ ?sum ?value)))))
 	
     ;(if (> ?*healthiness-factor* ?*healthiness-boundary*)
     ;    then
