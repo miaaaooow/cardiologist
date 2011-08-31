@@ -6,17 +6,14 @@
     ;SYMBOLS
     ?*healthy* = "healthy"
     ?*hypertension* = "hypertension"
-    ?*ischemic* = "ischemic desease"
+    ?*ischemia* = "ischemic disease"
     ?*arrhytmia* = "arrhytmia"
     ?*other* = "other"
-    ;NUM CONSTS for precise calculations of diagnosis
-    ?*healthiness-factor* = 0
-    ?*healthiness-boundary* = 1.0
+	;NUM CONSTS for precise calculations of diagnosis
+    ?*healthiness-boundary* = 0.8
     ?*hypertension-boundary* = 1.5
     ?*arrhytmia-boundary* = 1.5
-    ?*ischemic-boundary* = 1.5
-    ?*delta-boundary* = 1.5
-	?*tests-total-sum* = 3.0)
+    ?*ischemic-boundary* = 1.5)
 
 
 ; DEFFUNCTIONS
@@ -36,8 +33,10 @@
 	
 (deffunction is-BMI-normal (?BMI ?normal-value)
 	(if (> ?normal-value ?BMI)
-		then TRUE
-		else FALSE))
+		then 
+            TRUE
+		else 
+            FALSE))
      
 
 ; Heart-rate function
@@ -55,27 +54,6 @@
         then TRUE
         else FALSE))
 
-
-;Function to calculate the diagnosis on the base of a global delta 
-;If the delta is less than the delta-boundary, then we cannot decide which diagnosis is right
-; and go for "other" diagnosis.
-(deffunction find-diagnosis (?a ?i ?h)
-    (bind ?arr-delta (- ?a ?*arrhytmia-boundary*))
-    (bind ?hyp-delta (- ?h ?*hypertension-boundary*))
-    (bind ?isc-delta (- ?i ?*ischemic-boundary*))
-    (if (and 
-            (not (> ?arr-delta 0))
-            (not (> ?hyp-delta 0))
-            (not (> ?isc-delta 0)))
-        then ?*healthy*
-        else 
-            (if (and 
-                (not (> ?arr-delta ?*delta-boundary*))
-                (not (> ?hyp-delta ?*delta-boundary*))
-                (not (> ?isc-delta ?*delta-boundary*))
-                )
-            then ?*other*
-            else ?*healthy*)))
 
 
 ; Functions for asking questions
@@ -104,8 +82,10 @@
         (printout t "Please answer with \"y\" or \"n\" or \"yes\" or \"no\"; fill in \"no\" if not sure. " crlf)
         (bind ?answer (lowcase(read))))
    (if (or (eq ?answer yes) (eq ?answer y))
-       then TRUE
-       else FALSE))
+       then 
+          TRUE
+       else 
+          FALSE))
    
 
 (deffunction get-gender ()
@@ -147,7 +127,7 @@
 	then
 	   (printout t " - Creatine" crlf)
 	else
-	(if (eq ?diagnose ?*ischemic*)
+	(if (eq ?diagnose ?*ischemia*)
 	 then
 		(printout t " - CRD" crlf)
 		(printout t " - BET" crlf)
@@ -192,6 +172,11 @@
         heart-rate-increased high-blood-pressure)))
 
 
+(deftemplate symptom-present
+    (slot symptom (type SYMBOL)(allowed-values shortness-of-breath fatigue;
+		weakness rapid-heartbeat chest-pain has-swellings palpitations nausea;
+		sweating fainting hypertonic-ancestors)))
+
 (deftemplate diagnosis-possibilities
     (slot diagnosis-name (type SYMBOL) (allowed-values arrhytmia ischemia hypertension))
     (slot indicator (type SYMBOL) (allowed-values shortness-of-breath fatigue;
@@ -206,19 +191,28 @@
 
 
 (deftemplate process-further
-	(slot add-to-sum (type FLOAT)))
+	(slot accum (type FLOAT)))
+
+(deftemplate arrhytmia-accum
+	(slot accum (type FLOAT)))
+
+(deftemplate ischemia-accum
+	(slot accum (type FLOAT)))
+
+(deftemplate hypertension-accum
+	(slot accum (type FLOAT)))
 
 
-(deftemplate possible-desease
+(deftemplate possible-disease
     (slot is-possible (type SYMBOL) (allowed-values yes no)))
 
 
 ; FACTS
 
-; A matrix with empiric values of weights of which symptome proves which diagnosis.
+; A matrix with empiric values of weights of which symptom proves which diagnosis.
 ; These might be extracted during education with an expert.
 
-(deffacts diagnosis-symptome-weight-matrix
+(deffacts diagnosis-symptom-weight-matrix
 	(diagnosis-possibilities
 		(diagnosis-name hypertension) (indicator shortness-of-breath) (value 0.7))
 	(diagnosis-possibilities
@@ -271,8 +265,6 @@
 	(test-type
 		(test-name increased-liver-lung) (value 0.1))
 	(test-type
-		(test-name dizziness) (value 0.1))
-	(test-type
 		(test-name BMI-over-limit) (value 0.45))
 	(test-type
 		(test-name heart-rate-increased) (value 0.5))
@@ -294,7 +286,10 @@
 (defrule ask-for-personal-data "patient general tests information"
 	(declare (salience 100))
     =>
-    (assert (process-further (add-to-sum 0.0)))
+    (assert (process-further (accum 0.0)))
+    (assert (arrhytmia-accum (accum 0.0)))
+    (assert (ischemia-accum (accum 0.0)))
+    (assert (hypertension-accum (accum 0.0)))
 	(bind ?age (get-numeric-indicator "age" 1 125))
 	(bind ?gender (get-gender))
     (bind ?height (get-numeric-indicator "height" 100 280))
@@ -320,16 +315,16 @@
              (cardiac-status ?cs)
              (ECG ?ecg)
              (increased-liver-lung ?ill)))
-    ;if (not (is-BMI-normal ?BMI 30))
-	;then 
-	;(?value&:(test-type (test-name BMI-over-limit) (value ?value)))
-	;(assert (add-to-sum ?value)))
-   
-	;(if (is-high-blood-pressure (?age ?gender ?sbp ?dbp))
-	;	then 
-	;	(bind ?value&:(test-type (test-name heart-rate-increased) (value ?value)))
-	;	(assert (add-to-sum ?value)))
-		
+
+    (if (> ?BMI 30)
+	    then 
+		(assert (test-type-present (test-name BMI-over-limit))))		   
+	(if (is-high-blood-pressure ?age ?gender ?sbp ?dbp)
+	    then 
+		(assert (test-type-present (test-name high-blood-pressure))))		 
+    (if (not (is-heart-rate-ok ?hr ?age))
+        then
+		(assert (test-type-present (test-name heart-rate-increased))))
 	(if (not (eq ?ch ok))
 		then
 		(assert (test-type-present (test-name cardiac-history))))		
@@ -341,31 +336,136 @@
 		(assert (test-type-present (test-name ECG))))
 	(if (not (eq ?ill ok))
 		then
-		(assert (test-type-present (test-name increased-liver-lung)))))
-		
+		(assert (test-type-present (test-name increased-liver-lung))))
+    )
     
 
-(defrule make-conclusions
+(defrule make-init-calculations
     (declare (salience 90)) 
-	    (test-type-present (test-name ?name))
-	    (test-type (test-name ?tname&:(eq ?tname ?name)) (value ?value))
-        ?f <- (process-further (add-to-sum ?sum))
+	(test-type-present (test-name ?name))
+    (test-type (test-name ?tname&:(eq ?tname ?name)) (value ?value))
+    ?f <- (process-further (accum ?sum))
     =>
-        (retract ?f)
-	    (assert (process-further (add-to-sum (+ ?sum ?value)))))
+    (printout t ?name)
+    (retract ?f)
+	(assert (process-further (accum (+ ?sum ?value)))))
+
+(defrule has-diagnose
+    (declare (salience 80))
+    ?p <- (process-further (accum ?sum))
+    =>
+    (if (> ?sum ?*healthiness-boundary*)
+        then
+            (assert (possible-disease (is-possible yes)))
+        else
+            (assert (possible-disease (is-possible no)))) )
+
+(defrule healthy
+    (declare (salience 70))
+    (possible-disease (is-possible no))
+    =>
+    ; depending on (is-BMI-normal (BMI 30) - healthy or diet
+    )
+
+(defrule diagnose
+    (declare (salience 70))
+    (possible-disease (is-possible yes))
+    =>
+    (printout t "Please reply which of the following symptoms do you have" crlf)
+    (if (check-symptom  "shortness-of-breath")
+		then
+		(assert (symptom-present (symptom shortness-of-breath))))
+	(if (check-symptom "fatigue")
+		then
+		(assert (symptom-present (symptom fatigue))))		
+    (if (check-symptom "weakness")
+		then
+		(assert (symptom-present (symptom weakness))))
+    (if (check-symptom "rapid heartbeat")
+		then
+		(assert (symptom-present (symptom rapid-heartbeat))))
+    (if (check-symptom "chest pain")
+		then
+		(assert (symptom-present (symptom chest-pain))))
+    (if (check-symptom "swollen limbs")
+		then
+		(assert (symptom-present (symptom has-swellings))))
+    (if (check-symptom "palpitations")
+		then
+		(assert (symptom-present (symptom palpitations))))
+    (if (check-symptom "nausea")
+		then
+		(assert (symptom-present (symptom nausea))))
+    (if (check-symptom "sweating")
+		then
+		(assert (symptom-present (symptom sweating))))
+    (if (check-symptom "fainting")
+		then
+		(assert (symptom-present (symptom fainting))))
+	(if (check-symptom "hypertonic heritage/parents, grandparents/")
+		then
+		(assert (symptom-present (symptom hypertonic-ancestors)))))
+
+
+; Accumulators of weights
+(defrule calculate-arrhytmia-rating
+	(declare (salience 60))
+    (possible-disease (is-possible yes))
+	(diagnosis-possibilities (diagnosis-name arrhytmia) (indicator ?symptom) (value ?value))
+	(symptom-present (symptom ?sym&:(eq ?sym ?symptom)))
+	?f <- (arrhytmia-accum (accum ?accum))
+	=>
+    (retract ?f)
+	(assert (arrhytmia-accum (accum (+ ?accum ?value)))))
+
+(defrule calculate-ischemia-rating
+	(declare (salience 60))
+    (possible-disease (is-possible yes))
+	(diagnosis-possibilities (diagnosis-name ischemia) (indicator ?symptom) (value ?value))
+	(symptom-present (symptom ?sym&:(eq ?sym ?symptom)))
+	?f <- (ischemia-accum (accum ?accum))
+	=>
+    (retract ?f)
+	(assert (ischemia-accum (accum (+ ?accum ?value)))))
 	
-    ;(if (> ?*healthiness-factor* ?*healthiness-boundary*)
-    ;    then
-    ;        (assert (possible-disease (is-possible yes)))
-    ;    else
-    ;        (assert (possible-disease (is-possible no)))) )
+(defrule calculate-hypertension-rating
+	(declare (salience 60))
+    (possible-disease (is-possible yes))
+	(diagnosis-possibilities (diagnosis-name hypertension) (indicator ?symptom) (value ?value))
+	(symptom-present (symptom ?sym&:(eq ?sym ?symptom)))
+	?f <- (hypertension-accum (accum ?accum))
+	=>
+    (retract ?f)
+	(assert (hypertension-accum (accum (+ ?accum ?value)))))
 
+; Final printing rules
+(defrule set-diagnose 
+	(declare (salience 50))
+	(possible-disease (is-possible yes))
+	=>
+	(print-init-diagnose)
+)
 
-;(defrule test-info
-;)
-;(defrule check-diagnosis )
+(defrule set-arrhytmia
+	(declare (salience 40))
+	(arrhytmia-accum (accum ?accum&:(> ?accum  ?*arrhytmia-boundary*)))
+	=>
+	(print-diagnose ?*arrhytmia*)
+)
 
+(defrule set-ischemia
+	(declare (salience 40))
+	(ischemia-accum (accum ?accum&:(> ?accum  ?*ischemic-boundary*)))
+	=>
+	(print-diagnose ?*ischemia*)
+)
 
+(defrule set-hypertension
+	(declare (salience 40))
+	(hypertension-accum (accum ?accum&:(> ?accum  ?*hypertension-boundary*)))
+	=>
+	(print-diagnose ?*hypertension*)
+)		
 
 
 
