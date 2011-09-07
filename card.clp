@@ -74,18 +74,16 @@
 
 
 (deffunction check-symptom (?symptom)
-   (bind ?question  (str-cat "Do you lately happen to have the following symptom: ?sympom (yes/no) " ?symptom)) 
+   (bind ?question (str-cat "Do you lately happen to have the following symptom:" ?symptom "(yes/no) ")) 
    (printout t ?question)
    (bind ?answer (lowcase (read)))
-   (while (not (or (eq ?answer yes) (eq ?answer no))) do 
+   (while (not (or (eq ?answer yes) (eq ?answer no) (eq ?answer y) (eq ?answer n))) do 
         (printout t ?question crlf)
         (printout t "Please answer with \"y\" or \"n\" or \"yes\" or \"no\"; fill in \"no\" if not sure. " crlf)
         (bind ?answer (lowcase(read))))
    (if (or (eq ?answer yes) (eq ?answer y))
-       then 
-          TRUE
-       else 
-          FALSE))
+       then TRUE
+       else FALSE))
    
 
 (deffunction get-gender ()
@@ -342,17 +340,18 @@
 
 (defrule make-init-calculations
     (declare (salience 90)) 
-	(test-type-present (test-name ?name))
+	?tt <- (test-type-present (test-name ?name))
     (test-type (test-name ?tname&:(eq ?tname ?name)) (value ?value))
     ?f <- (process-further (accum ?sum))
     =>
     (printout t ?name)
     (retract ?f)
+    (retract ?tt)
 	(assert (process-further (accum (+ ?sum ?value)))))
 
 (defrule has-diagnose
     (declare (salience 80))
-    ?p <- (process-further (accum ?sum))
+    (process-further (accum ?sum))
     =>
     (if (> ?sum ?*healthiness-boundary*)
         then
@@ -364,6 +363,7 @@
     (declare (salience 70))
     (possible-disease (is-possible no))
     =>
+    (printout t "HEALTHY!")
     ; depending on (is-BMI-normal (BMI 30) - healthy or diet
     )
 
@@ -372,7 +372,7 @@
     (possible-disease (is-possible yes))
     =>
     (printout t "Please reply which of the following symptoms do you have" crlf)
-    (if (check-symptom  "shortness-of-breath")
+    (if (check-symptom "shortness-of-breath")
 		then
 		(assert (symptom-present (symptom shortness-of-breath))))
 	(if (check-symptom "fatigue")
@@ -411,31 +411,34 @@
 (defrule calculate-arrhytmia-rating
 	(declare (salience 60))
     (possible-disease (is-possible yes))
-	(diagnosis-possibilities (diagnosis-name arrhytmia) (indicator ?symptom) (value ?value))
+    ?d <- (diagnosis-possibilities (diagnosis-name arrhytmia) (indicator ?symptom) (value ?value))
 	(symptom-present (symptom ?sym&:(eq ?sym ?symptom)))
 	?f <- (arrhytmia-accum (accum ?accum))
 	=>
     (retract ?f)
+    (retract ?d)
 	(assert (arrhytmia-accum (accum (+ ?accum ?value)))))
 
 (defrule calculate-ischemia-rating
 	(declare (salience 60))
     (possible-disease (is-possible yes))
-	(diagnosis-possibilities (diagnosis-name ischemia) (indicator ?symptom) (value ?value))
+	?d <- (diagnosis-possibilities (diagnosis-name ischemia) (indicator ?symptom) (value ?value))
 	(symptom-present (symptom ?sym&:(eq ?sym ?symptom)))
 	?f <- (ischemia-accum (accum ?accum))
 	=>
     (retract ?f)
+    (retract ?d)
 	(assert (ischemia-accum (accum (+ ?accum ?value)))))
 	
 (defrule calculate-hypertension-rating
 	(declare (salience 60))
     (possible-disease (is-possible yes))
-	(diagnosis-possibilities (diagnosis-name hypertension) (indicator ?symptom) (value ?value))
+	?d <- (diagnosis-possibilities (diagnosis-name hypertension) (indicator ?symptom) (value ?value))
 	(symptom-present (symptom ?sym&:(eq ?sym ?symptom)))
 	?f <- (hypertension-accum (accum ?accum))
 	=>
     (retract ?f)
+    (retract ?d)
 	(assert (hypertension-accum (accum (+ ?accum ?value)))))
 
 ; Final printing rules
@@ -443,31 +446,30 @@
 	(declare (salience 50))
 	(possible-disease (is-possible yes))
 	=>
-	(print-init-diagnose)
-)
+	(print-init-diagnose))
 
 (defrule set-arrhytmia
 	(declare (salience 40))
 	(arrhytmia-accum (accum ?accum&:(> ?accum  ?*arrhytmia-boundary*)))
 	=>
-	(print-diagnose ?*arrhytmia*)
-)
+	(print-diagnose ?*arrhytmia*))
 
 (defrule set-ischemia
 	(declare (salience 40))
 	(ischemia-accum (accum ?accum&:(> ?accum  ?*ischemic-boundary*)))
 	=>
-	(print-diagnose ?*ischemia*)
-)
+	(print-diagnose ?*ischemia*))
 
 (defrule set-hypertension
 	(declare (salience 40))
 	(hypertension-accum (accum ?accum&:(> ?accum  ?*hypertension-boundary*)))
 	=>
-	(print-diagnose ?*hypertension*)
-)		
+	(print-diagnose ?*hypertension*))		
 
-
+(defrule say-goodbye
+    (declare (salience 1))
+    =>
+    (printout t "Thanks for using Cardiologist!" crlf "We wish you good health!" crlf "Goodbye!"))
 
 
 
