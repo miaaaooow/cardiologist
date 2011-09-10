@@ -13,7 +13,8 @@
     ?*healthiness-boundary* = 0.8
     ?*hypertension-boundary* = 1.5
     ?*arrhytmia-boundary* = 1.5
-    ?*ischemic-boundary* = 1.5)
+    ?*ischemic-boundary* = 1.5
+    ?*BMI-boundary* = 30)
 
 
 ; DEFFUNCTIONS
@@ -29,7 +30,7 @@
 ; mass and height are previously checked to be numbers
 (deffunction body-mass-index (?mass ?height)
     "This function calculates the body mass index"
-    (/ ?mass (* ?height ?height)))
+    (* (/ ?mass (* ?height ?height)) 10000) )
 	
 (deffunction is-BMI-normal (?BMI ?normal-value)
 	(if (> ?normal-value ?BMI)
@@ -50,7 +51,11 @@
 ; Function that measures high blood pressure
 ; Can be much more suffisticated
 (deffunction is-high-blood-pressure (?age ?gender ?sbp ?dbp)
-    (if (> ?dbp  130)
+    (if (or
+           (or (eq ?gender m) (> ?age 45)  (> ?sbp  145) (> ?dbp 100))
+           (or (eq ?gender m) (<= ?age 45) (> ?sbp  135) (> ?dbp 90))
+           (or (eq ?gender f) (> ?age 45)  (> ?sbp  140) (> ?dbp 95))
+           (or (eq ?gender f) (<= ?age 45) (> ?sbp  130) (> ?dbp 85)))
         then TRUE
         else FALSE))
 
@@ -74,7 +79,7 @@
 
 
 (deffunction check-symptom (?symptom)
-   (bind ?question (str-cat "Do you lately happen to have the following symptom:" ?symptom "(yes/no) ")) 
+   (bind ?question (str-cat "Do you lately happen to have the following symptom: " ?symptom " (yes/no): ")) 
    (printout t ?question)
    (bind ?answer (lowcase (read)))
    (while (not (or (eq ?answer yes) (eq ?answer no) (eq ?answer y) (eq ?answer n))) do 
@@ -87,7 +92,7 @@
    
 
 (deffunction get-gender ()
- (bind ?question  "Please enter your gender(m for male, f for female: ")
+ (bind ?question  "Please enter your gender(m for male, f for female): ")
   (printout t ?question)
   (bind ?answer (read))
   (while (and (not (eq ?answer m))(not (eq ?answer f))) do 
@@ -101,10 +106,10 @@
    (bind ?question (str-cat "Please enter your " ?indicator-name ": "))
    (printout t ?question)
    (bind ?answer (read))
-   (while (not (or (numberp ?answer) (>= ?answer ?lower-bound) (<= ?answer ?upper-bound))) do 
-        (printout t "Please enter a values between ?lower-bound and ?upper-bound" ?lower-bound ?upper-bound crlf)
+   (while (or (not (numberp ?answer)) (< ?answer ?lower-bound) (> ?answer ?upper-bound)) do 
+        (printout t "Please enter numeric values between " ?lower-bound " and " ?upper-bound ": " crlf)
         (printout t ?question)
-        (bind ?answer (lowcase(read))))
+        (bind ?answer (read)))
    ?answer)
 
 ;; Functions to print out results
@@ -204,6 +209,10 @@
 (deftemplate possible-disease
     (slot is-possible (type SYMBOL) (allowed-values yes no)))
 
+(deftemplate healthy
+    (slot on-diet (type SYMBOL) (allowed-values yes no)))
+
+
 
 ; FACTS
 
@@ -277,8 +286,8 @@
     (declare (salience 110))
     =>
     (welcome)
-    (watch facts))
-
+   ;(watch facts))
+)
 
 
 (defrule ask-for-personal-data "patient general tests information"
@@ -290,11 +299,11 @@
     (assert (hypertension-accum (accum 0.0)))
 	(bind ?age (get-numeric-indicator "age" 1 125))
 	(bind ?gender (get-gender))
-    (bind ?height (get-numeric-indicator "height" 100 280))
-    (bind ?weight (get-numeric-indicator "weight" 1 400))
-	(bind ?BMI (body-mass-index ?height ?weight))
-    (bind ?sbp (get-numeric-indicator "systolic blood pressure avg" 0 200))
-	(bind ?dbp (get-numeric-indicator "diastolic blood pressure avg" 0 350))
+    (bind ?height (get-numeric-indicator "height[cm]" 100 280))
+    (bind ?weight (get-numeric-indicator "weight[kg]" 1 400))
+	(bind ?BMI (body-mass-index ?weight ?height))
+    (bind ?dbp (get-numeric-indicator "diastolic blood pressure(lower bound) avg" 0 200))
+	(bind ?sbp (get-numeric-indicator "systolic blood pressure(upper bound) avg" 0 350))
 	(bind ?hr (get-numeric-indicator "heart rate" 0 220))
 	(bind ?ch (check-test-result "cardiac history"))
 	(bind ?cs (check-test-result "cardiac status"))
@@ -314,9 +323,12 @@
              (ECG ?ecg)
              (increased-liver-lung ?ill)))
 
-    (if (> ?BMI 30)
+    (if (> ?BMI ?*BMI-boundary*)
 	    then 
-		(assert (test-type-present (test-name BMI-over-limit))))		   
+		(assert (test-type-present (test-name BMI-over-limit)))
+        (assert (healthy (on-diet yes)))
+        else
+        (assert (healthy (on-diet no))))
 	(if (is-high-blood-pressure ?age ?gender ?sbp ?dbp)
 	    then 
 		(assert (test-type-present (test-name high-blood-pressure))))		 
@@ -362,9 +374,16 @@
 (defrule healthy
     (declare (salience 70))
     (possible-disease (is-possible no))
+    ?h <- (healthy (on-diet ?yn))
     =>
-    (printout t "HEALTHY!")
-    ; depending on (is-BMI-normal (BMI 30) - healthy or diet
+    (retract ?h)
+    (if (eq ?yn no)
+        then
+        (printout t "Congratulations! Your status is: HEALTHY!" crlf)
+        else
+        (printout t "Congratulations! You have no symptoms for any cardiac disease." crlf)
+        (printout t "Anyway, due to high BMI, we advise you to go a diet, in order ";
+                    "to prevent yourself from future health problems." crlf))
     )
 
 (defrule diagnose
@@ -469,7 +488,8 @@
 (defrule say-goodbye
     (declare (salience 1))
     =>
-    (printout t "Thanks for using Cardiologist!" crlf "We wish you good health!" crlf "Goodbye!"))
+    (printout t "Thanks for using Cardiologist!" crlf "We wish you good health!";
+                crlf "Goodbye!" crlf))
 
 
 
