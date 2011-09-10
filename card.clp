@@ -9,7 +9,7 @@
     ?*ischemia* = "ischemic disease"
     ?*arrhytmia* = "arrhytmia"
     ?*other* = "other"
-	;NUM CONSTS for precise calculations of diagnosis
+    ;NUM CONSTS for precise calculations of diagnosis
     ?*healthiness-boundary* = 0.8
     ?*hypertension-boundary* = 1.5
     ?*arrhytmia-boundary* = 1.5
@@ -45,20 +45,23 @@
 ; age and hr are previously checked to be numbers
 (deffunction is-heart-rate-ok (?heart-rate ?age) 
     (if (> (- 205.5 (* 0.685 ?age)) ?heart-rate)
-        then TRUE
-        else FALSE))
+        then 
+            TRUE
+        else 
+            FALSE))
 
 ; Function that measures high blood pressure
 ; Can be much more suffisticated
 (deffunction is-high-blood-pressure (?age ?gender ?sbp ?dbp)
     (if (or
-           (or (eq ?gender m) (> ?age 45)  (> ?sbp  145) (> ?dbp 100))
-           (or (eq ?gender m) (<= ?age 45) (> ?sbp  135) (> ?dbp 90))
-           (or (eq ?gender f) (> ?age 45)  (> ?sbp  140) (> ?dbp 95))
-           (or (eq ?gender f) (<= ?age 45) (> ?sbp  130) (> ?dbp 85)))
-        then TRUE
-        else FALSE))
-
+           (and (eq ?gender m) (> ?age 45)  (or (> ?sbp  145) (> ?dbp 100)))
+           (and (eq ?gender m) (<= ?age 45) (or (> ?sbp  135) (> ?dbp 90)))
+           (and (eq ?gender f) (> ?age 45)  (or (> ?sbp  140) (> ?dbp 95)))
+           (and (eq ?gender f) (<= ?age 45) (or (> ?sbp  130) (> ?dbp 85))))
+        then 
+            TRUE
+        else 
+            FALSE))
 
 
 ; Functions for asking questions
@@ -72,34 +75,36 @@
     (while (and (not (eq ?answer ok)) 
                 (not (eq ?answer pr))
 				(not (eq ?answer problematic))) do
-            (printout t "You have entered an invalid value. Please enter \"ok\" or \"pr\"" crlf)
+            (printout t "You have entered an invalid value. Please enter \"ok\" or \"pr\".: ")
             (printout t ?question)
             (bind ?answer (lowcase (read))))
     ?answer)
 
 
 (deffunction check-symptom (?symptom)
-   (bind ?question (str-cat "Do you lately happen to have the following symptom: " ?symptom " (yes/no): ")) 
-   (printout t ?question)
-   (bind ?answer (lowcase (read)))
-   (while (not (or (eq ?answer yes) (eq ?answer no) (eq ?answer y) (eq ?answer n))) do 
+    (bind ?question (str-cat "Do you lately happen to have the following symptom: " ?symptom " (Yes/No): ")) 
+    (printout t ?question)
+    (bind ?answer (lowcase (read)))
+    (while (not (or (eq ?answer yes) (eq ?answer no) (eq ?answer y) (eq ?answer n))) do 
         (printout t ?question crlf)
-        (printout t "Please answer with \"y\" or \"n\" or \"yes\" or \"no\"; fill in \"no\" if not sure. " crlf)
+        (printout t "Please answer with \"y\" or \"n\" or \"yes\" or \"no\"; fill in \"no\" if not sure.: ")
         (bind ?answer (lowcase(read))))
-   (if (or (eq ?answer yes) (eq ?answer y))
-       then TRUE
-       else FALSE))
+    (if (or (eq ?answer yes) (eq ?answer y))
+        then 
+            TRUE
+        else   
+            FALSE))
    
 
 (deffunction get-gender ()
- (bind ?question  "Please enter your gender(m for male, f for female): ")
-  (printout t ?question)
-  (bind ?answer (read))
-  (while (and (not (eq ?answer m))(not (eq ?answer f))) do 
-       (printout t "Please enter a values among \"f\" and \"m\"!"  crlf)
-       (printout t ?question)
-       (bind ?answer (lowcase(read))))
-  ?answer)
+    (bind ?question  "Please enter your gender[f/m]: ")
+    (printout t ?question)
+    (bind ?answer (read))
+    (while (not (or (eq ?answer m) (eq ?answer f) (eq ?answer F) (eq ?answer M))) do 
+        (printout t "Please enter a value among \"f\"= female and \"m\"=male.: ")
+        (printout t ?question)
+        (bind ?answer (read)))
+    ?answer)
 
 
 (deffunction get-numeric-indicator (?indicator-name ?lower-bound ?upper-bound)
@@ -107,13 +112,13 @@
    (printout t ?question)
    (bind ?answer (read))
    (while (or (not (numberp ?answer)) (< ?answer ?lower-bound) (> ?answer ?upper-bound)) do 
-        (printout t "Please enter numeric values between " ?lower-bound " and " ?upper-bound ": " crlf)
+        (printout t "Please enter a numeric value between " ?lower-bound " and " ?upper-bound ": " crlf)
         (printout t ?question)
         (bind ?answer (read)))
    ?answer)
 
-;; Functions to print out results
 
+;; Functions to print out results
 (deffunction print-init-diagnose ()
    (printout t "It seems you might have some cardiac issues." crlf)
    (printout t "Here is a list of further tests You are advised to make and then consult to Your cardiologist:" crlf)
@@ -121,6 +126,7 @@
    (printout t " - Blood Sugar" crlf)  
    (printout t " - Creatine" crlf)
    (printout t " - Lipid Profile" crlf))
+
 
 (deffunction print-diagnose (?diagnose)
    (bind ?diag (str-cat " There is a possibility that You have " ?diagnose ". " ))
@@ -131,16 +137,16 @@
 	   (printout t " - Creatine" crlf)
 	else
 	(if (eq ?diagnose ?*ischemia*)
-	 then
-		(printout t " - CRD" crlf)
-		(printout t " - BET" crlf)
-		(printout t " - Echo Cardiography" crlf)
-	 else
-	 (if (eq ?diagnose ?*arrhytmia*)
-	  then
-		(printout t " - Holter ECG" crlf)
-		(printout t " - TSH Hormone" crlf)
-		(printout t " - Echo Cardiography" crlf)))))
+	    then
+		    (printout t " - CRD" crlf)
+		    (printout t " - BET" crlf)
+		    (printout t " - Echo Cardiography" crlf)
+	    else
+	        (if (eq ?diagnose ?*arrhytmia*)
+	            then
+		        (printout t " - Holter ECG" crlf)
+	        	(printout t " - TSH Hormone" crlf)
+		        (printout t " - Echo Cardiography" crlf)))))
   
   
 ; DEFTEMPLATES
@@ -382,8 +388,8 @@
         (printout t "Congratulations! Your status is: HEALTHY!" crlf)
         else
         (printout t "Congratulations! You have no symptoms for any cardiac disease." crlf)
-        (printout t "Anyway, due to high BMI, we advise you to go a diet, in order ";
-                    "to prevent yourself from future health problems." crlf))
+        (printout t "Anyway, due to high BMI, we advise you to go on special diet," crlf ;
+                    "in order to prevent yourself from future health problems." crlf))
     )
 
 (defrule diagnose
@@ -488,7 +494,7 @@
 (defrule say-goodbye
     (declare (salience 1))
     =>
-    (printout t "Thanks for using Cardiologist!" crlf "We wish you good health!";
+    (printout t crlf "Thanks for using Cardiologist!" crlf "We wish you good health!";
                 crlf "Goodbye!" crlf))
 
 
